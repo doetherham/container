@@ -2,9 +2,9 @@
 
 namespace Centum\Core\Container\Exceptions;
 
-use Psr\Container\ContainerExceptionInterface;
+use Psr\Container\NotFoundExceptionInterface;
 
-class NotFoundException extends \Exception implements ContainerExceptionInterface
+class NotFoundException extends \Exception implements NotFoundExceptionInterface
 {
 
 }

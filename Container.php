@@ -3,10 +3,13 @@
 namespace Centum\Core\Container;
 
 use Centum\Core\Container\Exceptions\ContainerException;
+use Centum\Core\Container\Exceptions\NotFoundException;
+
 use Psr\Container\ContainerInterface;
 
 use Centum\Core\Container\Resolver\DependencyResolver;
 use Centum\Core\Container\Definition\ServiceDefinition;
+use Centum\Core\Container\Inflector\Inflector;
 
 class Container implements ContainerInterface
 {

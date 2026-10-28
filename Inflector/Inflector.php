@@ -17,7 +17,7 @@ class Inflector
 
     public function invokeMethod(string $name, array $args = []): static
     {
-        $this->methods[$name] = $name;
+        $this->methods[$name] = $args;
         return $this;
     }
 
