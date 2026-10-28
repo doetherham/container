@@ -10,79 +10,109 @@ use Centum\Core\Container\Definition\ServiceDefinition;
 
 class Container implements ContainerInterface
 {
-    private array $services = [];
+    /** @var ServiceDefinition[] */
+    private array $definitions = [];
+    /** @var Inflector[] */
+    private array $inflectors = [];
     private array $delegates = [];
     private array $instances = [];
-    private array $shared = [];
-    private DependencyResolver $resolver;
 
-    public function __construct(
-        ?DependencyResolver $resolver = null,
-    )
+    public function __construct(private ?DependencyResolver $resolver = null)
     {
-        $this->resolver = $resolver ?? new DependencyResolver();
+        $this->resolver ??= new DependencyResolver();
         $this->resolver->setContainer($this);
     }
 
-    public function add(string $id, string|object|null $concrete = null): void
+    public function add(string $id, string|object|null $concrete = null, bool $shared = false): ServiceDefinition
     {
-        if (is_null($concrete)) {
-            if (!class_exists($id)) {
-                throw new ContainerException("Service '$id' does not exist.");
-            }
-
-            $concrete = $id;
-        }
-
-        $this->services[$id] = $concrete;
+        return $this->definitions[$id] = (new ServiceDefinition($concrete ?? $id))->setShared($shared);
     }
 
-    public function addShared(string $id, string|object|null $concrete = null): void
+    public function addShared(string $id, string|object|null $concrete = null): ServiceDefinition
     {
-        $this->add($id, $concrete);
-        $this->shared[$id] = true;
+        return $this->add($id, $concrete, true);
     }
 
-    public function get(string $id): mixed
+    public function inflector(string $type): Inflector
     {
-        if(array_key_exists($id, $this->instances)) {
-            return $this->instances[$id];
-        }
+        return $this->inflectors[$type] ??= new Inflector($type);
+    }
 
-        if (!$this->has($id)) {
-            if (!class_exists($id)) {
-                throw new ContainerException("Service '$id' could not be resolved.");
-            }
-
-            $this->add($id);
-        }
-
-        $instance = $this->resolver->resolve($this->services[$id]);
-
-        if (isset($this->shared[$id])) {
-            $this->instances[$id] = $instance;
-        }
-
-        return $instance;
+    public function delegate(ContainerInterface $container): static
+    {
+        $this->delegates[] = $container;
+        return $this;
     }
 
     public function has(string $id): bool
     {
-        if (array_key_exists($id, $this->services)) {
+        if (isset($this->definitions[$id])) {
             return true;
         }
-
-        return array_any($this->delegates, fn($delegate) => $delegate->has($id));
+        foreach ($this->delegates as $delegate) {
+            if ($delegate->has($id)) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    /**
-     * @param ContainerInterface $container
-     * @return $this
-     */
-    public function delegate(ContainerInterface $container): self
+    public function get(string $id): mixed
     {
-        $this->delegates[] = $container;
+        if (array_key_exists($id, $this->instances)) {
+            return $this->instances[$id];
+        }
 
-        return $this;
+        if (isset($this->definitions[$id])) {
+            $definition = $this->definitions[$id];
+            $instance = $this->build($definition);
+
+            if (is_object($instance)) {
+                $this->inflect($instance);
+            }
+            if ($definition->isShared()) {
+                $this->instances[$id] = $instance;
+            }
+            return $instance;
+        }
+
+        foreach ($this->delegates as $delegate) {
+            if ($delegate->has($id)) {
+                return $delegate->get($id);
+            }
+        }
+
+        throw new NotFoundException("Service '$id' not found.");
+    }
+
+    private function build(ServiceDefinition $definition): mixed
+    {
+        $concrete = $definition->getConcrete();
+
+        if ($concrete instanceof \Closure) {
+            return $concrete($this);
+        }
+        if (is_object($concrete)) {
+            return $concrete;
+        }
+
+        if ($definition->getArguments()) {
+            $args = array_map(
+                fn($a) => is_string($a) && $this->has($a) ? $this->get($a) : $a,
+                $definition->getArguments()
+            );
+            return new $concrete(...$args);
+        }
+
+        return $this->resolver->resolve($concrete); // авто-вайринг
+    }
+
+    private function inflect(object $object): void
+    {
+        foreach ($this->inflectors as $type => $inflector) {
+            if ($object instanceof $type) {
+                $inflector->inflect($object, $this);
+            }
+        }
     }
 }

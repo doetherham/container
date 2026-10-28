@@ -6,6 +6,19 @@ class ServiceDefinition implements ServiceDefinitionInterface
 {
     private array $arguments = [];
 
+    private bool $shared = false;
+
+    public function setShared(bool $shared = true): self
+    {
+        $this->shared = $shared;
+        return $this;
+    }
+
+    public function isShared(): bool
+    {
+        return $this->shared;
+    }
+
     public function __construct(
         private readonly string|object $concrete
     )

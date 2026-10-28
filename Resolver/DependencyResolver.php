@@ -39,17 +39,16 @@ class DependencyResolver implements DependencyResolverInterface
 
         /** @var \ReflectionParameter $param */
         foreach ($parameters as $param) {
-            $service_type = $param->getType();
+            $type = $param->getType();
 
-            if($service_type !== null && !$service_type->isBuiltin()) {
-                $service = $this->container->get($service_type->getName());
-                $dependencies[] = $service;
+            if ($type instanceof \ReflectionNamedType && !$type->isBuiltin()) {
+                $dependencies[] = $this->container->get($type->getName());
+            } elseif ($param->isDefaultValueAvailable()) {
+                $dependencies[] = $param->getDefaultValue();
+            } elseif ($type?->allowsNull()) {
+                $dependencies[] = null;
             } else {
-                if ($param->isDefaultValueAvailable()) {
-                    $dependencies[] = $param->getDefaultValue();
-                } else {
-                    throw new ContainerException("Cannot resolve scalar parameter '\${$param->getName()}'");
-                }
+                throw new ContainerException("Cannot resolve parameter '\${$param->getName()}'");
             }
         }
 
