@@ -4,7 +4,7 @@ namespace Centum\Core\Container\Exceptions;
 
 use Psr\Container\NotFoundExceptionInterface;
 
-class NotFoundException extends \Exception implements NotFoundExceptionInterface
+class NotFoundException extends ContainerException implements NotFoundExceptionInterface
 {
 
 }
